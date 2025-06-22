@@ -2,8 +2,8 @@ import pytest
 
 from datetime import date
 from models.resource import Resource
-from models.time_slot import SlotSet, TimeSlot
-from models.date_slot import DateSlot
+from models.time_slot import TimeSlotSet, TimeSlot
+from models.date_time_slot import DateTimeSlot
 from models.time import Time
 
 class TestResourceDefaultAvailability:
@@ -11,10 +11,10 @@ class TestResourceDefaultAvailability:
         self.resource = Resource('r1', 'Printer')
 
         # Monday 09:00-17:00
-        monday = SlotSet({TimeSlot(Time(9, 0), Time(17, 0))})
+        monday = TimeSlotSet({TimeSlot(Time(9, 0), Time(17, 0))})
 
         # Tuesday split availability 08-12 and 13-17
-        tuesday = SlotSet({
+        tuesday = TimeSlotSet({
             TimeSlot(Time(8, 0), Time(12, 0)),
             TimeSlot(Time(13, 0), Time(17, 0)),
         })
@@ -38,17 +38,17 @@ class TestResourceDefaultAvailability:
         ],
     )
     def test_is_available_from_default(self, test_date, start, end, expected):
-        slot = DateSlot(test_date, start, end)
+        slot = DateTimeSlot(test_date, start, end)
         assert self.resource.is_available(slot) is expected
 
 
     def test_is_available_without_default(self):
         resource = Resource('r2', 'Projector')
-        slot = DateSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
+        slot = DateTimeSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
         assert resource.is_available(slot) is False
 
     def test_explicit_empty_default(self):
         resource = Resource('r6', 'Scanner')
-        resource.set_default_availability({0: SlotSet()})
-        slot = DateSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
+        resource.set_default_availability({0: TimeSlotSet()})
+        slot = DateTimeSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
         assert resource.is_available(slot) is False

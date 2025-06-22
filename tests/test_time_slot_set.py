@@ -1,6 +1,6 @@
 import pytest
 
-from models.time_slot import TimeSlot, SlotSet
+from models.time_slot import TimeSlot, TimeSlotSet
 from models.time import Time
 
 
@@ -25,7 +25,7 @@ from models.time import Time
     ],
 )
 def test_slot_set_add(initial_slots, new_slot, expected):
-    ss = SlotSet(set(initial_slots))
+    ss = TimeSlotSet(set(initial_slots))
     ss.add(new_slot)
     assert ss.slots == expected
 
@@ -56,7 +56,7 @@ def test_slot_set_add(initial_slots, new_slot, expected):
     ],
 )
 def test_slot_set_remove_success(initial_slots, remove_slot, expected):
-    ss = SlotSet(set(initial_slots))
+    ss = TimeSlotSet(set(initial_slots))
     ss.remove(remove_slot)
     assert ss.slots == expected
 
@@ -69,7 +69,7 @@ def test_slot_set_remove_success(initial_slots, remove_slot, expected):
     ],
 )
 def test_slot_set_remove_failure(initial_slots, remove_slot):
-    ss = SlotSet(set(initial_slots))
+    ss = TimeSlotSet(set(initial_slots))
     with pytest.raises(KeyError):
         ss.remove(remove_slot)
 
@@ -92,19 +92,19 @@ def test_slot_set_remove_failure(initial_slots, remove_slot):
     ],
 )
 def test_slot_set_merge(set_a, set_b, expected):
-    ss_a = SlotSet(set_a)
-    ss_b = SlotSet(set_b)
+    ss_a = TimeSlotSet(set_a)
+    ss_b = TimeSlotSet(set_b)
     ss_a.merge(ss_b)
     assert ss_a.slots == expected
 
 
 def test_slot_set_overlaps():
-    ss = SlotSet({TimeSlot(Time(9, 0), Time(10, 0))})
+    ss = TimeSlotSet({TimeSlot(Time(9, 0), Time(10, 0))})
     assert ss.overlaps(TimeSlot(Time(9, 30), Time(9, 45))) is True
     assert ss.overlaps(TimeSlot(Time(10, 0), Time(11, 0))) is False
 
 
 def test_slot_set_includes():
-    ss = SlotSet({TimeSlot(Time(9, 0), Time(11, 0))})
+    ss = TimeSlotSet({TimeSlot(Time(9, 0), Time(11, 0))})
     assert ss.includes(TimeSlot(Time(9, 30), Time(10, 0))) is True
     assert ss.includes(TimeSlot(Time(8, 0), Time(9, 0))) is False

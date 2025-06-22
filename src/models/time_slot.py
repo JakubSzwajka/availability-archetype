@@ -31,7 +31,7 @@ class TimeSlot:
 
         return TimeSlot(min(self.start_time, other.start_time), max(self.end_time, other.end_time))
 
-    def subtract(self, other: "TimeSlot") -> "SlotSet":
+    def subtract(self, other: "TimeSlot") -> "TimeSlotSet":
         if not self.overlaps(other):
             raise ValueError(f"Slots {self} and {other} do not overlap")
 
@@ -40,10 +40,10 @@ class TimeSlot:
             slots.add(TimeSlot(self.start_time, other.start_time))
         if self.end_time > other.end_time:
             slots.add(TimeSlot(other.end_time, self.end_time))
-        return SlotSet(slots)
+        return TimeSlotSet(slots)
 
     @abstractmethod
-    def extend(self, delta: Time) -> "SlotSet": ...
+    def extend(self, delta: Time) -> "TimeSlotSet": ...
 
     def _extend_is_less_then_sod(self, delta: Time) -> bool:
         diff_hour = self.start_time.hour - delta.hour
@@ -68,7 +68,7 @@ class TimeSlot:
 
 
 @dataclass(frozen=True, slots=True)
-class SlotSet():
+class TimeSlotSet():
     slots: set[TimeSlot] = field(default_factory=set)
 
     def add(self, slot: TimeSlot):
@@ -98,7 +98,7 @@ class SlotSet():
             # no overlapping slot found -> KeyError to mirror set.remove behaviour
             raise KeyError(slot)
 
-    def merge(self, other: "SlotSet") -> "SlotSet":
+    def merge(self, other: "TimeSlotSet") -> "TimeSlotSet":
         for slot in other.slots:
             self.add(slot)
         return self

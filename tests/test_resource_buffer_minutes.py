@@ -2,8 +2,8 @@ import pytest
 
 from datetime import date
 from models.resource import Resource
-from models.time_slot import SlotSet, TimeSlot
-from models.date_slot import DateSlot
+from models.time_slot import TimeSlotSet, TimeSlot
+from models.date_time_slot import DateTimeSlot
 from models.time import Time
 
 class TestResourceBufferMinutes:
@@ -12,11 +12,11 @@ class TestResourceBufferMinutes:
         self.resource = Resource('rb', 'Bike', buffer_minutes=15)
 
         # Monday 09-17 availability
-        self.resource.set_default_availability({0: SlotSet({TimeSlot(Time(9, 0), Time(17, 0))})})
+        self.resource.set_default_availability({0: TimeSlotSet({TimeSlot(Time(9, 0), Time(17, 0))})})
 
         # Add a lock 13:00-14:00 on Monday
         self.lock_date = date(2025, 7, 7)  # Monday
-        self.resource.lock(DateSlot(self.lock_date, Time(13, 0), Time(14, 0)))
+        self.resource.lock(DateTimeSlot(self.lock_date, Time(13, 0), Time(14, 0)))
 
     @pytest.mark.parametrize(
         'start,end,expected',
@@ -34,17 +34,17 @@ class TestResourceBufferMinutes:
         ],
     )
     def test_buffer_effect(self, start, end, expected):
-        slot = DateSlot(self.lock_date, start, end)
+        slot = DateTimeSlot(self.lock_date, start, end)
         assert self.resource.is_available(slot) is expected
 
     def test_back_to_back_locks_with_buffer(self):
         # existing lock 13-14 with buffer 15
         # add another lock 14:05-15:00 which overlaps buffer (should merge effectively)
-        self.resource.lock(DateSlot(self.lock_date, Time(14, 5), Time(15, 0)))
+        self.resource.lock(DateTimeSlot(self.lock_date, Time(14, 5), Time(15, 0)))
 
         # query 14:20-14:30 should be unavailable due to second lock
-        assert self.resource.is_available(DateSlot(self.lock_date, Time(14, 20), Time(14, 30))) is False
+        assert self.resource.is_available(DateTimeSlot(self.lock_date, Time(14, 20), Time(14, 30))) is False
 
         # query 15:15-15:30 should be available (buffer ends 15:15)
-        assert self.resource.is_available(DateSlot(self.lock_date, Time(15, 15), Time(15, 30))) is True
+        assert self.resource.is_available(DateTimeSlot(self.lock_date, Time(15, 15), Time(15, 30))) is True
 
