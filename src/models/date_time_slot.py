@@ -7,6 +7,9 @@ class DateTimeSlot(TimeSlot):
         self.date = date
         super().__init__(start_time, end_time)
 
+    def __str__(self) -> str:
+        return f"{self.date} {self.start_time} - {self.end_time}"
+
     def extend(self, delta: Time) -> "TimeSlotSet":
         slots = TimeSlotSet()
         base_slot = DateTimeSlot(

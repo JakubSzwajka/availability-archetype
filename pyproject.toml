@@ -5,9 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "faker>=37.4.0",
+    "psycopg2>=2.9.10",
     "pydantic>=2.11.7",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
+    "sqlalchemy>=2.0.41",
 ]
 
 [tool.pytest.ini_options]

@@ -1,60 +1,140 @@
-"""Quick playground demonstrating Resource availability features for a single user."""
+"""Benchmark script for mass-seeding resources and querying availability."""
 
-from datetime import date
+import sys
+import logging
+import time
+import uuid
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session
 
-# NOTE: If you reorganised code into packages (models.time_slot, models.resource, etc.)
-# adjust the imports below accordingly.
-from models.resource import Resource
-from models.time_slot import TimeSlotSet, TimeSlot
+from db import Base
+from faker import Faker
+
 from models.date_time_slot import DateTimeSlot
+from models.resource import Resource
 from models.time import Time
+from models.time_slot import TimeSlotSet
+from models.weekday_time_slot import WeekDayTimeSlot
+from resource_facade import ResourceFacade
+from resource_repo import ResourceRepo
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
 
-def banner(title: str):
-    print("\n" + "=" * 10, title, "=" * 10)
+logger = logging.getLogger(__name__)
 
+faker = Faker()
+repo = ResourceRepo()
 
-def main() -> None:
-    # 1. Create resource with a 15-minute buffer before/after every lock
-    resource = Resource("printer-1", "Office Printer", buffer_minutes=15)
+url = "postgresql://postgres:@localhost/archetype-availability"
+engine = create_engine(url)
 
-    # 2. Default weekly availability (09:00-17:00 Monday-Friday)
-    weekday_slot = TimeSlotSet({TimeSlot(Time(9, 0), Time(17, 0))})
-    resource.set_default_availability({i: weekday_slot for i in range(0, 5)})
+RESOURCE_COUNT = 1_000
+QUERY_RUNS = 50
 
-    banner("Default availability (Mon-Fri 9-17)")
-    monday = date(2025, 6, 23)  # Monday
-    print("10-11:", resource.is_available(DateTimeSlot(monday, Time(10, 0), Time(11, 0))))
-    print("17-18:", resource.is_available(DateTimeSlot(monday, Time(17, 0), Time(18, 0))))
+# @event.listens_for(engine, "before_cursor_execute")
+# def _before(conn, cursor, statement, params, context, executemany):
+#     context._query_start = time.perf_counter()
 
-    # 3. Overwrite availability for a specific date (make Tuesday morning only)
-    tuesday = date(2025, 6, 24)
-    resource.set_overwrite_availability(
-        tuesday,
-        TimeSlotSet({TimeSlot(Time(9, 0), Time(12, 0))}),
+# @event.listens_for(engine, "after_cursor_execute")
+# def _after(conn, cursor, statement, params, context, executemany):
+#     dur = time.perf_counter() - context._query_start
+#     logger.info("SQL %.3f ms  %s", dur * 1_000, statement.split()[0])
+
+def create_resource() -> Resource:
+    resource = Resource(
+        id=str(uuid.uuid4()),
+        name=faker.name(),
+        buffer_minutes=faker.random_int(min=0, max=30, step=15),
+        booking_upfront_days=faker.random_int(min=0, max=180),
     )
 
-    banner("Tuesday overwrite (9-12 only)")
-    print("10-11:", resource.is_available(DateTimeSlot(tuesday, Time(10, 0), Time(11, 0))))
-    print("14-15:", resource.is_available(DateTimeSlot(tuesday, Time(14, 0), Time(15, 0))))
+    # Add 7 days of default availability
+    default_availability = {}
+    for weekday in range(7):
+        default_availability[weekday] = TimeSlotSet({
+            WeekDayTimeSlot(
+                week_day=weekday,
+                start_time=Time(8, 0),
+                end_time=Time(17, 0),
+            )
+        })
+    resource.set_default_availability(default_availability)
 
-    # 4. Add a booking lock on Monday 13-14 (buffer makes it 12:45-14:15)
-    resource.lock(DateTimeSlot(monday, Time(13, 0), Time(14, 0)))
+    # Add 100 days of overwrite availability randomly spread out
+    for day in range(100):
+        date = datetime.now(UTC).date() + timedelta(days=day)
+        slots = TimeSlotSet({
+            DateTimeSlot(
+                date=date,
+                start_time=Time(12, 0),
+                end_time=Time(17, 0),
+            )
+        })
+        resource.set_overwrite_availability(date, slots)
 
-    banner("Lock Monday 13-14 with 15-min buffer")
-    print("12:30-12:44:", resource.is_available(DateTimeSlot(monday, Time(12, 30), Time(12, 44))))
-    print("12:45-13:00:", resource.is_available(DateTimeSlot(monday, Time(12, 45), Time(13, 0))))
-    print("14:00-14:14:", resource.is_available(DateTimeSlot(monday, Time(14, 0), Time(14, 14))))
-    print("14:15-14:30:", resource.is_available(DateTimeSlot(monday, Time(14, 15), Time(14, 30))))
+    # Add 100 days of lock availability randomly spread out
+    for day in range(100):
+        date = datetime.now(UTC).date() + timedelta(days=day)
+        resource.lock(DateTimeSlot(
+            date=date,
+            start_time=Time(12, 0),
+            end_time=Time(17, 0),
+        ))
 
-    # 5. Mark a full day off by locking 00:00-23:59
-    day_off = date(2025, 7, 3)
-    resource.lock(DateTimeSlot(day_off, Time(0, 0), Time(23, 59)))
+    return resource
 
-    banner(f"Whole day off {day_off}")
-    print("09-10:", resource.is_available(DateTimeSlot(day_off, Time(9, 0), Time(10, 0))))
+def drop_and_create_schema() -> None:
+    logger.info("Recreating database schema …")
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
 
+def seed_resources(resource_count: int) -> None:
+    logger.info("Seeding %s resources …", resource_count)
+    seed_start = time.perf_counter()
+    with Session(engine) as session:
+        for _ in range(resource_count):
+            resource = create_resource()
+            repo.save(resource, session)
+    seed_elapsed = time.perf_counter() - seed_start
+    logger.info("Seeded %s resources in %.2f s", resource_count, seed_elapsed)
+
+def main(resource_count: int = RESOURCE_COUNT) -> None:
+    drop_and_create_schema()
+    seed_resources(resource_count)
+
+    search_slot = DateTimeSlot(
+        date=datetime.now(UTC).date() + timedelta(days=7),
+        start_time=Time(10, 0),
+        end_time=Time(11, 0),
+    )
+
+    facade = ResourceFacade(repo)
+
+    logger.info("Executing availability query %s times …", QUERY_RUNS)
+    timings: list[float] = []
+    for _ in range(QUERY_RUNS):
+        with Session(engine) as session:
+            t0 = time.perf_counter()
+            facade.get_available_at(search_slot, session)
+            timings.append(time.perf_counter() - t0)
+
+    avg_time = sum(timings) / QUERY_RUNS
+    logger.info(
+        "Average query time over %s runs: %.4f s (min %.4f, max %.4f)",
+        QUERY_RUNS,
+        avg_time,
+        min(timings),
+        max(timings),
+    )
 
 if __name__ == "__main__":
-    main()
+    args = sys.argv[1:]
+    resource_count = int(args[0])
+    main(resource_count)
+    print('-----' * 10)

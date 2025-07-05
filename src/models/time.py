@@ -1,3 +1,5 @@
+from datetime import time
+
 
 class Time:
     def __init__(self, hour: int, minute: int):
@@ -33,6 +35,9 @@ class Time:
 
     def __str__(self) -> str:
         return f"{self.hour:02d}:{self.minute:02d}"
+
+    def time(self) -> time:
+        return time(self.hour, self.minute)
 
     @classmethod
     def eod(cls) -> "Time":
