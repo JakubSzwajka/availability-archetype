@@ -105,8 +105,8 @@ def seed_resources(resource_count: int) -> None:
     logger.info("Seeded %s resources in %.2f s", resource_count, seed_elapsed)
 
 def main(resource_count: int = RESOURCE_COUNT) -> None:
-    drop_and_create_schema()
-    seed_resources(resource_count)
+    # drop_and_create_schema()
+    # seed_resources(resource_count)
 
     search_slot = DateTimeSlot(
         date=datetime.now(UTC).date() + timedelta(days=7),
@@ -115,13 +115,16 @@ def main(resource_count: int = RESOURCE_COUNT) -> None:
     )
 
     facade = ResourceFacade(repo)
+    # with Session(engine) as session:
+    #     facade.get_available_at(search_slot, session)
 
     logger.info("Executing availability query %s times …", QUERY_RUNS)
     timings: list[float] = []
-    for _ in range(QUERY_RUNS):
+    page_size = 50
+    for i in range(QUERY_RUNS):
         with Session(engine) as session:
             t0 = time.perf_counter()
-            facade.get_available_at(search_slot, session)
+            facade.get_available_at(search_slot, session, page_size, i * page_size)
             timings.append(time.perf_counter() - t0)
 
     avg_time = sum(timings) / QUERY_RUNS

@@ -151,7 +151,7 @@ class ResourceRepo:
 
         return [self._to_domain(row) for row in resource_rows]
 
-    def get_all_for_slot(self, session: Session, slot: DateTimeSlot) -> list[Resource]:
+    def get_all_for_slot(self, session: Session, slot: DateTimeSlot, limit: int, offset: int) -> list[Resource]:
         week_day = slot.date.weekday()
         slot_alias = AvailabilitySlotModel
 
@@ -180,6 +180,8 @@ class ResourceRepo:
             .join(slot_alias, slot_alias.resource_id == ResourceModel.id)
             .filter(filter)
             .distinct()
+            .limit(limit)
+            .offset(offset)
         ).subquery()
 
 
