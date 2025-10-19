@@ -35,16 +35,7 @@ url = "postgresql://postgres:@localhost/archetype-availability"
 engine = create_engine(url)
 
 RESOURCE_COUNT = 1_000
-QUERY_RUNS = 50
-
-# @event.listens_for(engine, "before_cursor_execute")
-# def _before(conn, cursor, statement, params, context, executemany):
-#     context._query_start = time.perf_counter()
-
-# @event.listens_for(engine, "after_cursor_execute")
-# def _after(conn, cursor, statement, params, context, executemany):
-#     dur = time.perf_counter() - context._query_start
-#     logger.info("SQL %.3f ms  %s", dur * 1_000, statement.split()[0])
+QUERY_RUNS = 2
 
 
 def create_resource() -> Resource:

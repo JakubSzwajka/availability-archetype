@@ -1,16 +1,33 @@
 from enum import StrEnum
 from datetime import date as date_type, time
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Date, Time as SQLTime, Index, text
+from sqlalchemy import (
+    String,
+    DateTime,
+    Integer,
+    ForeignKey,
+    Date,
+    Time as SQLTime,
+    Index,
+    text,
+)
 from uuid import uuid4
 from datetime import datetime, UTC
 
+
 class Base(DeclarativeBase):
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid4())
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
 
 class ResourceModel(Base):
     __tablename__ = "resources"
@@ -19,7 +36,10 @@ class ResourceModel(Base):
     buffer_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     booking_upfront_days: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    availability_slots: Mapped[list["AvailabilitySlotModel"]] = relationship(back_populates="resource")
+    availability_slots: Mapped[list["AvailabilitySlotModel"]] = relationship(
+        back_populates="resource"
+    )
+
 
 class AvailabilitySlotModel(Base):
     __tablename__ = "resource_availability_slots"
@@ -55,7 +75,9 @@ class AvailabilitySlotModel(Base):
         BOOKING = "booking"
         GOOGLE_CALENDAR = "google_calendar"
 
-    resource_id: Mapped[str] = mapped_column(String, ForeignKey("resources.id"), nullable=False)
+    resource_id: Mapped[str] = mapped_column(
+        String, ForeignKey("resources.id"), nullable=False
+    )
     resource: Mapped[ResourceModel] = relationship(back_populates="availability_slots")
 
     week_day: Mapped[int] = mapped_column(Integer, nullable=True)
@@ -66,4 +88,3 @@ class AvailabilitySlotModel(Base):
     slot_type: Mapped[SlotType] = mapped_column(String, nullable=False)
     lock_type: Mapped[LockType] = mapped_column(String, nullable=True)
     lock_by_id: Mapped[str] = mapped_column(String, nullable=True)
-

@@ -21,3 +21,34 @@ so we see there are two relations:
 - default availability is the tricky part here. The problem is that it cannot be represented as a point in time. Monday at 10:00? But which Monday? Next? Previous? So we cannot use all the goodies that we have from datetime lib. Thats why to simplify the operations on time, to know that 2:00 - 3:00 is moving over midnight and we should actually have two timestamps like 23:00-23:59 and 00:00 - 2:00.
 
 - biggest achivement? 64test cases in 0.09s ? Testing most of the time management logic? Lol. Take my money.
+
+## Performance & Complexity
+
+### Query Algorithm (`ResourceRepo.get_all_for_slot`)
+**Time Complexity**: O(M + P·S_filtered)
+- M = matching availability slots across all resources
+- P = page_size (typically 50)
+- S_filtered = average slots loaded per resource (filtered by date/weekday)
+
+**Strategy**: Two-phase query
+1. Subquery finds resource IDs with matching slots (filtered + paginated)
+2. Main query loads resources with filtered slot relationships
+
+**Benchmark**: ~0.3s per query with 1,000 resources × ~210 slots each (210K total slots)
+
+### Save Algorithm (`ResourceRepo.save`)
+**Time Complexity**: O(S)
+- S = total slots per resource (~210 typical)
+
+**Strategy**: Set-based reconciliation using composite keys
+1. Build desired state from domain model: O(S)
+2. Build current state from database: O(S)
+3. Compute delta (set difference): O(S)
+4. Apply changes (DELETE + INSERT): O(|changes|)
+
+**Key Insight**: Uses `AvailabilitySlotKey` (business attribute tuple) instead of database IDs for efficient diff without maintaining ID mappings in memory.
+
+### Scalability Notes
+- Pagination performance remains stable across deep offsets (tested 0-2450)
+- Requires composite indexes on `(slot_type, week_day, start_time, end_time)` and `(slot_type, date, start_time, end_time)`
+- Selectinload prevents N+1 queries when fetching resource availability
