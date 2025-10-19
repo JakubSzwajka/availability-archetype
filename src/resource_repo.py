@@ -13,6 +13,13 @@ from models.time_slot import TimeSlotSet
 from models.weekday_time_slot import WeekDayTimeSlot
 
 
+# Composite key uniquely identifying an availability slot by business attributes
+# (slot_type_value, week_day, date_iso, start_hour, start_minute, end_hour, end_minute)
+AvailabilitySlotKey = tuple[
+    AvailabilitySlotModel.SlotType, int, str, int, int, int, int
+]
+
+
 # helper
 def _time_from(t: Time) -> _time:
     return _time(hour=t.hour, minute=t.minute)
@@ -26,9 +33,9 @@ class ResourceRepo:
         d: date | None,
         start: Time,
         end: Time,
-    ) -> tuple:
+    ) -> AvailabilitySlotKey:
         return (
-            slot_type.value,
+            slot_type,
             week_day if week_day is not None else -1,
             d.isoformat() if d else "",
             start.hour,
@@ -38,43 +45,49 @@ class ResourceRepo:
         )
 
     def _to_domain(self, resource_row: ResourceModel) -> Resource:
-            resource = Resource(
-                id=resource_row.id,
-                name=resource_row.name,
-                buffer_minutes=resource_row.buffer_minutes,
-                booking_upfront_days=resource_row.booking_upfront_days,
-            )
+        resource = Resource(
+            id=resource_row.id,
+            name=resource_row.name,
+            buffer_minutes=resource_row.buffer_minutes,
+            booking_upfront_days=resource_row.booking_upfront_days,
+        )
 
-            default_map: dict[int, TimeSlotSet] = {}
-            overwrite_map: dict[_date, TimeSlotSet] = {}
+        default_map: dict[int, TimeSlotSet] = {}
+        overwrite_map: dict[_date, TimeSlotSet] = {}
 
-            for slot_row in resource_row.availability_slots:
-                start_time = Time(slot_row.start_time.hour, slot_row.start_time.minute)
-                end_time = Time(slot_row.end_time.hour, slot_row.end_time.minute)
-                if slot_row.slot_type == AvailabilitySlotModel.SlotType.DEFAULT:
-                    default_map.setdefault(slot_row.week_day, TimeSlotSet()).add(WeekDayTimeSlot(
+        for slot_row in resource_row.availability_slots:
+            start_time = Time(slot_row.start_time.hour, slot_row.start_time.minute)
+            end_time = Time(slot_row.end_time.hour, slot_row.end_time.minute)
+            if slot_row.slot_type == AvailabilitySlotModel.SlotType.DEFAULT:
+                default_map.setdefault(slot_row.week_day, TimeSlotSet()).add(
+                    WeekDayTimeSlot(
                         week_day=slot_row.week_day,
                         start_time=start_time,
                         end_time=end_time,
-                    ))
-                elif slot_row.slot_type == AvailabilitySlotModel.SlotType.OVERWRITE:
-                    overwrite_map.setdefault(slot_row.date, TimeSlotSet()).add(DateTimeSlot(
+                    )
+                )
+            elif slot_row.slot_type == AvailabilitySlotModel.SlotType.OVERWRITE:
+                overwrite_map.setdefault(slot_row.date, TimeSlotSet()).add(
+                    DateTimeSlot(
                         date=slot_row.date,
                         start_time=start_time,
                         end_time=end_time,
-                    ))
-                elif slot_row.slot_type == AvailabilitySlotModel.SlotType.LOCK:
-                    resource.lock(DateTimeSlot(
+                    )
+                )
+            elif slot_row.slot_type == AvailabilitySlotModel.SlotType.LOCK:
+                resource.lock(
+                    DateTimeSlot(
                         date=slot_row.date,
                         start_time=start_time,
                         end_time=end_time,
-                    ))
+                    )
+                )
 
-            if default_map:
-                resource.set_default_availability(default_map)
-            for d, set_ in overwrite_map.items():
-                resource.set_overwrite_availability(d, set_)
-            return resource
+        if default_map:
+            resource.set_default_availability(default_map)
+        for d, set_ in overwrite_map.items():
+            resource.set_overwrite_availability(d, set_)
+        return resource
 
     def get(self, resource_id: str, session: Session) -> Resource:
         with session.begin():
@@ -125,7 +138,8 @@ class ResourceRepo:
 
         slot_filter = or_(
             and_(
-                AvailabilitySlotModel.slot_type == AvailabilitySlotModel.SlotType.DEFAULT,
+                AvailabilitySlotModel.slot_type
+                == AvailabilitySlotModel.SlotType.DEFAULT,
                 AvailabilitySlotModel.week_day == week_day,
             ),
             and_(
@@ -144,36 +158,40 @@ class ResourceRepo:
             .filter(ResourceModel.id.in_(select(id_subq.c.id)))
             .options(
                 selectinload(ResourceModel.availability_slots),
-                with_loader_criteria(AvailabilitySlotModel, slot_filter, include_aliases=True),
+                with_loader_criteria(
+                    AvailabilitySlotModel, slot_filter, include_aliases=True
+                ),
             )
             .all()
         )
 
         return [self._to_domain(row) for row in resource_rows]
 
-    def get_all_for_slot(self, session: Session, slot: DateTimeSlot, limit: int, offset: int) -> list[Resource]:
+    def get_all_for_slot(
+        self, session: Session, slot: DateTimeSlot, limit: int, offset: int
+    ) -> list[Resource]:
         week_day = slot.date.weekday()
         slot_alias = AvailabilitySlotModel
 
         filter = or_(
-                    and_(
-                        slot_alias.slot_type == AvailabilitySlotModel.SlotType.DEFAULT,
-                        slot_alias.week_day == week_day,
-                        slot_alias.start_time <= slot.start_time.time(),
-                        slot_alias.end_time >= slot.end_time.time(),
-                    ),
-                    and_(
-                        slot_alias.slot_type.in_(
-                            [
-                                AvailabilitySlotModel.SlotType.OVERWRITE,
-                                AvailabilitySlotModel.SlotType.LOCK,
-                            ]
-                        ),
-                        slot_alias.date == slot.date,
-                        slot_alias.start_time <= slot.start_time.time(),
-                        slot_alias.end_time >= slot.end_time.time(),
-                    ),
-                )
+            and_(
+                slot_alias.slot_type == AvailabilitySlotModel.SlotType.DEFAULT,
+                slot_alias.week_day == week_day,
+                slot_alias.start_time <= slot.start_time.time(),
+                slot_alias.end_time >= slot.end_time.time(),
+            ),
+            and_(
+                slot_alias.slot_type.in_(
+                    [
+                        AvailabilitySlotModel.SlotType.OVERWRITE,
+                        AvailabilitySlotModel.SlotType.LOCK,
+                    ]
+                ),
+                slot_alias.date == slot.date,
+                slot_alias.start_time <= slot.start_time.time(),
+                slot_alias.end_time >= slot.end_time.time(),
+            ),
+        )
 
         id_subq = (
             select(ResourceModel.id)
@@ -184,13 +202,14 @@ class ResourceRepo:
             .offset(offset)
         ).subquery()
 
-
         resource_rows = (
             session.query(ResourceModel)
             .filter(ResourceModel.id.in_(select(id_subq.c.id)))
             .options(
                 selectinload(ResourceModel.availability_slots),
-                with_loader_criteria(AvailabilitySlotModel, filter, include_aliases=True),
+                with_loader_criteria(
+                    AvailabilitySlotModel, filter, include_aliases=True
+                ),
             )
             .all()
         )
@@ -206,13 +225,17 @@ class ResourceRepo:
 
             db_resource.name = resource.name
             db_resource.buffer_minutes = getattr(resource, "_Resource__buffer_minutes")
-            db_resource.booking_upfront_days = getattr(resource, "_Resource__booking_upfront_days")
+            db_resource.booking_upfront_days = getattr(
+                resource, "_Resource__booking_upfront_days"
+            )
 
-            desired_keys: set[tuple] = set()
+            desired_keys: set[AvailabilitySlotKey] = set()
             desired_rows: list[AvailabilitySlotModel] = []
 
             # default availability
-            for week_day, slot_set in getattr(resource, "_Resource__default_availability").items():
+            for week_day, slot_set in getattr(
+                resource, "_Resource__default_availability"
+            ).items():
                 for slot in slot_set.slots:
                     key = self._make_key(
                         AvailabilitySlotModel.SlotType.DEFAULT,
@@ -279,7 +302,7 @@ class ResourceRepo:
                     )
 
             # compute existing keys
-            existing_keys_to_id: dict[tuple, str] = {
+            existing_keys_to_id: dict[AvailabilitySlotKey, str] = {
                 self._make_key(
                     r.slot_type,
                     r.week_day,
@@ -300,20 +323,25 @@ class ResourceRepo:
             if keys_to_delete:
                 ids = [existing_keys_to_id[k] for k in keys_to_delete]
                 session.execute(
-                    delete(AvailabilitySlotModel).where(AvailabilitySlotModel.id.in_(ids))
+                    delete(AvailabilitySlotModel).where(
+                        AvailabilitySlotModel.id.in_(ids)
+                    )
                 )
 
             # insert new rows
             if keys_to_insert:
-                rows_to_add = [row for row in desired_rows if self._make_key(
-                    row.slot_type,
-                    row.week_day,
-                    row.date,
-                    Time(row.start_time.hour, row.start_time.minute),
-                    Time(row.end_time.hour, row.end_time.minute),
-                ) in keys_to_insert]
+                rows_to_add = [
+                    row
+                    for row in desired_rows
+                    if self._make_key(
+                        row.slot_type,
+                        row.week_day,
+                        row.date,
+                        Time(row.start_time.hour, row.start_time.minute),
+                        Time(row.end_time.hour, row.end_time.minute),
+                    )
+                    in keys_to_insert
+                ]
                 session.bulk_save_objects(rows_to_add)
 
             # nothing to do for unchanged rows – left intact
-
-

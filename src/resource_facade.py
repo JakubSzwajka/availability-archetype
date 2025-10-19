@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from logging import getLogger
 from models.date_time_slot import DateTimeSlot
 from models.resource import Resource
-from models.time_slot import TimeSlot
 from resource_repo import ResourceRepo
 
 logger = getLogger(__name__)
@@ -16,7 +15,9 @@ class ResourceFacade:
     def get_resource(self, resource_id: str, session: Session) -> Resource:
         return self.resource_repo.get(resource_id, session)
 
-    def get_available_at(self, slot: DateTimeSlot, session: Session, limit: int, offset: int) -> list[Resource]:
+    def get_available_at(
+        self, slot: DateTimeSlot, session: Session, limit: int, offset: int
+    ) -> list[Resource]:
         # --- SQL phase ---
         t0_sql = time.perf_counter()
         resources = self.resource_repo.get_all_for_slot(session, slot, limit, offset)

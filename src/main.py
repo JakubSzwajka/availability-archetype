@@ -6,7 +6,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from db import Base
@@ -46,6 +46,7 @@ QUERY_RUNS = 50
 #     dur = time.perf_counter() - context._query_start
 #     logger.info("SQL %.3f ms  %s", dur * 1_000, statement.split()[0])
 
+
 def create_resource() -> Resource:
     resource = Resource(
         id=str(uuid.uuid4()),
@@ -55,44 +56,52 @@ def create_resource() -> Resource:
     )
 
     # Add 7 days of default availability
-    default_availability = {}
+    default_availability: dict[int, TimeSlotSet] = {}
     for weekday in range(7):
-        default_availability[weekday] = TimeSlotSet({
-            WeekDayTimeSlot(
-                week_day=weekday,
-                start_time=Time(8, 0),
-                end_time=Time(17, 0),
-            )
-        })
+        default_availability[weekday] = TimeSlotSet(
+            {
+                WeekDayTimeSlot(
+                    week_day=weekday,
+                    start_time=Time(8, 0),
+                    end_time=Time(17, 0),
+                )
+            }
+        )
     resource.set_default_availability(default_availability)
 
     # Add 100 days of overwrite availability randomly spread out
     for day in range(100):
         date = datetime.now(UTC).date() + timedelta(days=day)
-        slots = TimeSlotSet({
-            DateTimeSlot(
-                date=date,
-                start_time=Time(12, 0),
-                end_time=Time(17, 0),
-            )
-        })
+        slots = TimeSlotSet(
+            {
+                DateTimeSlot(
+                    date=date,
+                    start_time=Time(12, 0),
+                    end_time=Time(17, 0),
+                )
+            }
+        )
         resource.set_overwrite_availability(date, slots)
 
     # Add 100 days of lock availability randomly spread out
     for day in range(100):
         date = datetime.now(UTC).date() + timedelta(days=day)
-        resource.lock(DateTimeSlot(
-            date=date,
-            start_time=Time(12, 0),
-            end_time=Time(17, 0),
-        ))
+        resource.lock(
+            DateTimeSlot(
+                date=date,
+                start_time=Time(12, 0),
+                end_time=Time(17, 0),
+            )
+        )
 
     return resource
+
 
 def drop_and_create_schema() -> None:
     logger.info("Recreating database schema …")
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+
 
 def seed_resources(resource_count: int) -> None:
     logger.info("Seeding %s resources …", resource_count)
@@ -103,6 +112,7 @@ def seed_resources(resource_count: int) -> None:
             repo.save(resource, session)
     seed_elapsed = time.perf_counter() - seed_start
     logger.info("Seeded %s resources in %.2f s", resource_count, seed_elapsed)
+
 
 def main(resource_count: int = RESOURCE_COUNT) -> None:
     # drop_and_create_schema()
@@ -136,8 +146,9 @@ def main(resource_count: int = RESOURCE_COUNT) -> None:
         max(timings),
     )
 
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     resource_count = int(args[0])
     main(resource_count)
-    print('-----' * 10)
+    print("-----" * 10)

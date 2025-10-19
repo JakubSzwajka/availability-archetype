@@ -13,3 +13,5 @@ wheels/
 .coverage
 
 .env
+
+.claude

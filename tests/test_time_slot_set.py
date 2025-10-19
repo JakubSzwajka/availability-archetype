@@ -4,27 +4,36 @@ from models.time_slot import TimeSlot, TimeSlotSet
 from models.time import Time
 
 
-
 @pytest.mark.parametrize(
     "initial_slots,new_slot,expected",
     [
         # add into empty set
         ([], TimeSlot(Time(9, 0), Time(10, 0)), {TimeSlot(Time(9, 0), Time(10, 0))}),
         # add non-overlapping (adjacent)
-        ([TimeSlot(Time(9, 0), Time(10, 0))], TimeSlot(Time(10, 0), Time(11, 0)), {
-            TimeSlot(Time(9, 0), Time(11, 0)),
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(10, 0))],
+            TimeSlot(Time(10, 0), Time(11, 0)),
+            {
+                TimeSlot(Time(9, 0), Time(11, 0)),
+            },
+        ),
         # add overlapping – should merge
-        ([TimeSlot(Time(9, 0), Time(10, 0))], TimeSlot(Time(9, 30), Time(11, 0)), {
-            TimeSlot(Time(9, 0), Time(11, 0))
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(10, 0))],
+            TimeSlot(Time(9, 30), Time(11, 0)),
+            {TimeSlot(Time(9, 0), Time(11, 0))},
+        ),
         # chain merge: existing 9-10, 11-12; adding 10-11 merges all into 9-12
-        ([TimeSlot(Time(9, 0), Time(10, 0)), TimeSlot(Time(11, 0), Time(12, 0))], TimeSlot(Time(10, 0), Time(11, 0)), {
-            TimeSlot(Time(9, 0), Time(12, 0))
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(10, 0)), TimeSlot(Time(11, 0), Time(12, 0))],
+            TimeSlot(Time(10, 0), Time(11, 0)),
+            {TimeSlot(Time(9, 0), Time(12, 0))},
+        ),
     ],
 )
-def test_slot_set_add(initial_slots, new_slot, expected):
+def test_slot_set_add(
+    initial_slots: list[TimeSlot], new_slot: TimeSlot, expected: set[TimeSlot]
+):
     ss = TimeSlotSet(set(initial_slots))
     ss.add(new_slot)
     assert ss.slots == expected
@@ -34,28 +43,50 @@ def test_slot_set_add(initial_slots, new_slot, expected):
     "initial_slots,remove_slot,expected",
     [
         # remove middle part – expect split into two
-        ([TimeSlot(Time(9, 0), Time(12, 0))], TimeSlot(Time(10, 0), Time(11, 0)), {
-            TimeSlot(Time(9, 0), Time(10, 0)),
-            TimeSlot(Time(11, 0), Time(12, 0)),
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(12, 0))],
+            TimeSlot(Time(10, 0), Time(11, 0)),
+            {
+                TimeSlot(Time(9, 0), Time(10, 0)),
+                TimeSlot(Time(11, 0), Time(12, 0)),
+            },
+        ),
         # remove prefix
-        ([TimeSlot(Time(9, 0), Time(12, 0))], TimeSlot(Time(9, 0), Time(10, 0)), {
-            TimeSlot(Time(10, 0), Time(12, 0)),
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(12, 0))],
+            TimeSlot(Time(9, 0), Time(10, 0)),
+            {
+                TimeSlot(Time(10, 0), Time(12, 0)),
+            },
+        ),
         # remove suffix
-        ([TimeSlot(Time(9, 0), Time(12, 0))], TimeSlot(Time(11, 0), Time(12, 0)), {
-            TimeSlot(Time(9, 0), Time(11, 0)),
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(12, 0))],
+            TimeSlot(Time(11, 0), Time(12, 0)),
+            {
+                TimeSlot(Time(9, 0), Time(11, 0)),
+            },
+        ),
         # remove exact match
-        ([TimeSlot(Time(9, 0), Time(10, 0))], TimeSlot(Time(9, 0), Time(10, 0)), set()),
+        (
+            [TimeSlot(Time(9, 0), Time(10, 0))],
+            TimeSlot(Time(9, 0), Time(10, 0)),
+            set[TimeSlot](),
+        ),
         # remove across two slots
-        ([TimeSlot(Time(9, 0), Time(10, 0)), TimeSlot(Time(11, 0), Time(12, 0))], TimeSlot(Time(9, 30), Time(11, 30)), {
-            TimeSlot(Time(9, 0), Time(9, 30)),
-            TimeSlot(Time(11, 30), Time(12, 0)),
-        }),
+        (
+            [TimeSlot(Time(9, 0), Time(10, 0)), TimeSlot(Time(11, 0), Time(12, 0))],
+            TimeSlot(Time(9, 30), Time(11, 30)),
+            {
+                TimeSlot(Time(9, 0), Time(9, 30)),
+                TimeSlot(Time(11, 30), Time(12, 0)),
+            },
+        ),
     ],
 )
-def test_slot_set_remove_success(initial_slots, remove_slot, expected):
+def test_slot_set_remove_success(
+    initial_slots: list[TimeSlot], remove_slot: TimeSlot, expected: set[TimeSlot]
+):
     ss = TimeSlotSet(set(initial_slots))
     ss.remove(remove_slot)
     assert ss.slots == expected
@@ -68,7 +99,7 @@ def test_slot_set_remove_success(initial_slots, remove_slot, expected):
         ([TimeSlot(Time(9, 0), Time(10, 0))], TimeSlot(Time(10, 0), Time(11, 0))),
     ],
 )
-def test_slot_set_remove_failure(initial_slots, remove_slot):
+def test_slot_set_remove_failure(initial_slots: list[TimeSlot], remove_slot: TimeSlot):
     ss = TimeSlotSet(set(initial_slots))
     with pytest.raises(KeyError):
         ss.remove(remove_slot)
@@ -91,7 +122,9 @@ def test_slot_set_remove_failure(initial_slots, remove_slot):
         ),
     ],
 )
-def test_slot_set_merge(set_a, set_b, expected):
+def test_slot_set_merge(
+    set_a: set[TimeSlot], set_b: set[TimeSlot], expected: set[TimeSlot]
+):
     ss_a = TimeSlotSet(set_a)
     ss_b = TimeSlotSet(set_b)
     ss_a.merge(ss_b)

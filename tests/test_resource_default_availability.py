@@ -6,22 +6,25 @@ from models.time_slot import TimeSlotSet, TimeSlot
 from models.date_time_slot import DateTimeSlot
 from models.time import Time
 
+
 class TestResourceDefaultAvailability:
     def setup_method(self):
-        self.resource = Resource('r1', 'Printer')
+        self.resource = Resource("r1", "Printer")
 
         # Monday 09:00-17:00
         monday = TimeSlotSet({TimeSlot(Time(9, 0), Time(17, 0))})
 
         # Tuesday split availability 08-12 and 13-17
-        tuesday = TimeSlotSet({
-            TimeSlot(Time(8, 0), Time(12, 0)),
-            TimeSlot(Time(13, 0), Time(17, 0)),
-        })
+        tuesday = TimeSlotSet(
+            {
+                TimeSlot(Time(8, 0), Time(12, 0)),
+                TimeSlot(Time(13, 0), Time(17, 0)),
+            }
+        )
         self.resource.set_default_availability({0: monday, 1: tuesday})
 
     @pytest.mark.parametrize(
-        'test_date,start,end,expected',
+        "test_date,start,end,expected",
         [
             # Monday inside window
             (date(2025, 6, 23), Time(9, 30), Time(10, 30), True),
@@ -37,18 +40,19 @@ class TestResourceDefaultAvailability:
             (date(2025, 6, 26), Time(9, 0), Time(10, 0), False),
         ],
     )
-    def test_is_available_from_default(self, test_date, start, end, expected):
+    def test_is_available_from_default(
+        self, test_date: date, start: Time, end: Time, expected: bool
+    ):
         slot = DateTimeSlot(test_date, start, end)
         assert self.resource.is_available(slot) is expected
 
-
     def test_is_available_without_default(self):
-        resource = Resource('r2', 'Projector')
+        resource = Resource("r2", "Projector")
         slot = DateTimeSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
         assert resource.is_available(slot) is False
 
     def test_explicit_empty_default(self):
-        resource = Resource('r6', 'Scanner')
+        resource = Resource("r6", "Scanner")
         resource.set_default_availability({0: TimeSlotSet()})
         slot = DateTimeSlot(date(2025, 6, 23), Time(9, 0), Time(10, 0))
         assert resource.is_available(slot) is False

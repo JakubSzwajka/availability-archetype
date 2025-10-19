@@ -11,7 +11,9 @@ class Time:
     def __lt__(self, other: "Time") -> bool:
         return (self.hour, self.minute) < (other.hour, other.minute)
 
-    def __eq__(self, other: "Time") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Time):
+            return False
         return (self.hour, self.minute) == (other.hour, other.minute)
 
     def __le__(self, other: "Time") -> bool:

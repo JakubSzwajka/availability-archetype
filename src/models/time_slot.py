@@ -2,6 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from models.time import Time
 
+
 class TimeSlot:
     start_time: Time
     end_time: Time
@@ -12,7 +13,9 @@ class TimeSlot:
         self.start_time = start_time
         self.end_time = end_time
 
-    def __eq__(self, other: "TimeSlot") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TimeSlot):
+            return False
         return self.start_time == other.start_time and self.end_time == other.end_time
 
     def __hash__(self) -> int:
@@ -26,16 +29,22 @@ class TimeSlot:
 
     def merge(self, other: "TimeSlot") -> "TimeSlot":
         # allow merging when slots overlap or are directly adjacent (touching endpoints)
-        if not (self.overlaps(other) or self.end_time == other.start_time or self.start_time == other.end_time):
+        if not (
+            self.overlaps(other)
+            or self.end_time == other.start_time
+            or self.start_time == other.end_time
+        ):
             raise ValueError(f"Slots {self} and {other} cannot be merged")
 
-        return TimeSlot(min(self.start_time, other.start_time), max(self.end_time, other.end_time))
+        return TimeSlot(
+            min(self.start_time, other.start_time), max(self.end_time, other.end_time)
+        )
 
     def subtract(self, other: "TimeSlot") -> "TimeSlotSet":
         if not self.overlaps(other):
             raise ValueError(f"Slots {self} and {other} do not overlap")
 
-        slots = set()
+        slots = set[TimeSlot]()
         if self.start_time < other.start_time:
             slots.add(TimeSlot(self.start_time, other.start_time))
         if self.end_time > other.end_time:
@@ -66,9 +75,8 @@ class TimeSlot:
             return False
 
 
-
 @dataclass(frozen=True, slots=True)
-class TimeSlotSet():
+class TimeSlotSet:
     slots: set[TimeSlot] = field(default_factory=set)
 
     def add(self, slot: TimeSlot):
@@ -108,4 +116,3 @@ class TimeSlotSet():
 
     def includes(self, slot: TimeSlot) -> bool:
         return any(s.includes(slot) for s in self.slots)
-

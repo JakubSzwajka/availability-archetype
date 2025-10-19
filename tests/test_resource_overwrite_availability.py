@@ -6,20 +6,23 @@ from models.time_slot import TimeSlotSet, TimeSlot
 from models.date_time_slot import DateTimeSlot
 from models.time import Time
 
+
 class TestResourceOverwriteAvailability:
     def setup_method(self):
-        self.resource = Resource('r3', 'Camera')
+        self.resource = Resource("r3", "Camera")
 
         # default availability same as previous suite
         monday = TimeSlotSet({TimeSlot(Time(9, 0), Time(17, 0))})
-        tuesday = TimeSlotSet({
-            TimeSlot(Time(8, 0), Time(12, 0)),
-            TimeSlot(Time(13, 0), Time(17, 0)),
-        })
+        tuesday = TimeSlotSet(
+            {
+                TimeSlot(Time(8, 0), Time(12, 0)),
+                TimeSlot(Time(13, 0), Time(17, 0)),
+            }
+        )
         self.resource.set_default_availability({0: monday, 1: tuesday})
 
     @pytest.mark.parametrize(
-        'overwrite_slots, test_date, start, end, expected',
+        "overwrite_slots, test_date, start, end, expected",
         [
             # overwrite narrows monday window to 10-12
             (
@@ -55,7 +58,14 @@ class TestResourceOverwriteAvailability:
             ),
         ],
     )
-    def test_is_available_overwrite(self, overwrite_slots, test_date, start, end, expected):
+    def test_is_available_overwrite(
+        self,
+        overwrite_slots: TimeSlotSet,
+        test_date: date,
+        start: Time,
+        end: Time,
+        expected: bool,
+    ):
         # apply overwrite regardless (may be empty)
         self.resource.set_overwrite_availability(test_date, overwrite_slots)
 
