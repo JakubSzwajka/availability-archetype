@@ -13,6 +13,9 @@ from sqlalchemy import (
 )
 from uuid import uuid4
 from datetime import datetime, UTC
+from sqlalchemy_utils import DateTimeRangeType
+from sqlalchemy import Integer, ARRAY
+from sqlalchemy.dialects.postgresql import INT8RANGE
 
 
 class Base(DeclarativeBase):
@@ -80,11 +83,25 @@ class AvailabilitySlotModel(Base):
     )
     resource: Mapped[ResourceModel] = relationship(back_populates="availability_slots")
 
-    week_day: Mapped[int] = mapped_column(Integer, nullable=True)
-    date: Mapped[date_type] = mapped_column(Date, nullable=True)
-    start_time: Mapped[time] = mapped_column(SQLTime, nullable=False)
-    end_time: Mapped[time] = mapped_column(SQLTime, nullable=False)
+    # week_day: Mapped[int] = mapped_column(Integer, nullable=True)
+    # date: Mapped[date_type] = mapped_column(Date, nullable=True)
+    # start_time: Mapped[time] = mapped_column(SQLTime, nullable=False)
+    # end_time: Mapped[time] = mapped_column(SQLTime, nullable=False)
 
     slot_type: Mapped[SlotType] = mapped_column(String, nullable=False)
     lock_type: Mapped[LockType] = mapped_column(String, nullable=True)
     lock_by_id: Mapped[str] = mapped_column(String, nullable=True)
+
+    datetime_slot = mapped_column(DateTimeRangeType, nullable=False)
+    week_day_slot = mapped_column(ARRAY(INT8RANGE), nullable=False)
+
+
+# class AvailabilityDateTimeSlotModel(Base):
+#     __tablename__ = "resource_availability_slots_2"
+
+#     resource_id: Mapped[str] = mapped_column(
+#         String, ForeignKey("resources.id"), nullable=False
+#     )
+#     resource: Mapped[ResourceModel] = relationship(back_populates="availability_slots")
+#     datetime_slot = mapped_column(DateTimeRangeType, nullable=False)
+#     week_day_slot = mapped_column(ARRAY(INT8RANGE), nullable=False)

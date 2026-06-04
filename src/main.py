@@ -106,7 +106,7 @@ def seed_resources(resource_count: int) -> None:
 
 
 def main(resource_count: int = RESOURCE_COUNT) -> None:
-    # drop_and_create_schema()
+    drop_and_create_schema()
     # seed_resources(resource_count)
 
     search_slot = DateTimeSlot(
